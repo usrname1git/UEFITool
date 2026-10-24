@@ -123,6 +123,7 @@ private slots:
     void collapseItemRecursively();
 
     void toggleBootGuardMarking(bool enabled);
+    void lockDocks(bool locked);
     void onDockStateChange(const bool state);
     void enableDock(QDockWidget* const dock, const bool enable);
     void resetDocks();

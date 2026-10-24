@@ -554,6 +554,7 @@
     <addaction name="actionToggleBootGuardMarking"/>
     <addaction name="separator"/>
     <addaction name="actionResetDocks"/>
+    <addaction name="actionLockDocks"/>
     <addaction name="separator"/>
     <addaction name="actionCopyItemName"/>
     <addaction name="separator"/>
@@ -1100,6 +1101,14 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Shift+L</string>
+   </property>
+  </action>
+  <action name="actionLockDocks">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Lock docks layout</string>
    </property>
   </action>
  </widget>

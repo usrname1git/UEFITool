@@ -43,6 +43,7 @@ void print_usage()
         << "       UEFIExtract imagefile GUID_1 ... [ -o FILE_1 ... ] [ -m MODE_1 ... ] [ -t TYPE_1 ... ] -" << std::endl
         << "         Dump only FFS file(s) with specific GUID(s), without report or GUID database." << std::endl
         << "         Type is section type or FF to ignore. Mode is one of: all, body, unc_data, header, info, file." << std::endl
+        << "         Explicit modes include matching non-leaf items; the default dump remains leaf-only." << std::endl
         << "         Return value is a bit mask where 0 at position N means that file with GUID_N was found and unpacked, 1 otherwise." << std::endl;
 }
 

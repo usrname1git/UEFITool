@@ -122,6 +122,7 @@ markingEnabled(true)
     connect(ui->actionUncompressedHashSha512, SIGNAL(triggered()), this, SLOT(hashUncompressedSha512()));
     connect(ui->actionUncompressedHashSm3, SIGNAL(triggered()), this, SLOT(hashUncompressedSm3()));
     connect(ui->actionResetDocks, SIGNAL(triggered()), this, SLOT(resetDocks()));
+    connect(ui->actionLockDocks, SIGNAL(toggled(bool)), this, SLOT(lockDocks(bool)));
     for (auto dock : findChildren<QDockWidget*>()) {
         connect(dock, SIGNAL(topLevelChanged(bool)), this, SLOT(onDockStateChange(bool)));
         connect(dock, SIGNAL(visibilityChanged(bool)), this, SLOT(onDockStateChange(bool)));
@@ -943,6 +944,20 @@ void UEFITool::checkAndUpdateDocks()
     }
 }
 
+void UEFITool::lockDocks(bool locked)
+{
+    const bool wayland = QGuiApplication::platformName().contains("wayland", Qt::CaseInsensitive);
+    for (auto dock : findChildren<QDockWidget*>()) {
+        auto features = dock->features() & ~(QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+        if (!locked) {
+            features |= QDockWidget::DockWidgetMovable;
+            if (!wayland)
+                features |= QDockWidget::DockWidgetFloatable;
+        }
+        dock->setFeatures(features);
+    }
+}
+
 void UEFITool::resetDocks()
 {
     selectedHexView.setReadOnly(true);
@@ -1355,6 +1370,8 @@ void UEFITool::readSettings()
         // We need to reset the UI for state version transition here to prevent a possible crash
         resetDocks();
     }
+    ui->actionLockDocks->setChecked(settings.value("mainWindow/docksLocked", false).toBool());
+    lockDocks(ui->actionLockDocks->isChecked());
     
     ui->structureTreeView->setColumnWidth(0, settings.value("tree/columnWidth0", ui->structureTreeView->columnWidth(0)).toInt());
     ui->structureTreeView->setColumnWidth(1, settings.value("tree/columnWidth1", ui->structureTreeView->columnWidth(1)).toInt());
@@ -1396,6 +1413,7 @@ void UEFITool::writeSettings()
     QSettings settings(this);
     settings.setValue("mainWindow/geometry", saveGeometry());
     settings.setValue("mainWindow/windowState", saveState(1)); // Manually update the state version to 1
+    settings.setValue("mainWindow/docksLocked", ui->actionLockDocks->isChecked());
     settings.setValue("tree/columnWidth0", ui->structureTreeView->columnWidth(0));
     settings.setValue("tree/columnWidth1", ui->structureTreeView->columnWidth(1));
     settings.setValue("tree/columnWidth2", ui->structureTreeView->columnWidth(2));

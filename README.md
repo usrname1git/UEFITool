@@ -90,7 +90,7 @@ downloads. From the repository root on Windows:
 
 ```powershell
 cmake -S tests -B build-descriptor-tests
-cmake --build build-descriptor-tests --config Release --target descriptor_access_tests descriptor_parser_tests
+cmake --build build-descriptor-tests --config Release --target descriptor_access_tests descriptor_parser_tests parser_regression_tests
 ctest --test-dir build-descriptor-tests -C Release --output-on-failure
 ```
 
@@ -104,3 +104,34 @@ inspection mode is available as `descriptor_parser_tests --inspect <image>`.
 Public real-image checks used MSI `E13Q3IMS.112` (IE/IPSE slot present) and
 `E1824IMS.11B` (slot absent), linked in
 [LongSoft/UEFITool#485](https://github.com/LongSoft/UEFITool/pull/485).
+
+## Parser and dock-layout regressions
+
+The bundled Brotli 1.2.0 decoder includes the upstream security backport
+[`0ed4268`](https://github.com/google/brotli/commit/0ed4268a4401abcb4472096340477cf4af7d1a2b)
+for CVE-2026-111497. An impossible block switch is a format error, not a
+request for more input.
+
+Explicit UEFIExtract `header`, `body`, `unc_data` and `file` modes include
+matching non-leaf items. `body` remains the stored bytes; `unc_data` is the
+decompressed data. GUID and section-type filters still apply. The default
+leaf-only dump and `all` mode retain their behavior.
+
+NVRAM candidates that pass format recognition but fail Kaitai parsing now
+produce a diagnostic with the format, parent-relative offset and failure
+reason. Unrecognized data remains quiet during probing. Parsing remains
+read-only; a failed candidate is not promoted to a valid store.
+
+View -> Lock docks layout prevents dock movement and floating, persists
+across sessions, and preserves close controls. Unlocking does not enable
+floating on Wayland. Explicit Reset docks layout remains available.
+
+The native regression target above covers extraction, NVRAM diagnostics and
+Brotli decoding. With the existing Qt 6 SDK, the real GUI action and settings
+path can also be exercised (native window on Windows, offscreen elsewhere):
+
+```powershell
+cmake -S . -B build -DBUILD_TESTING=ON -DBUILD_UI_TESTS=ON
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
+```
