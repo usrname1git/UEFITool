@@ -14,6 +14,7 @@
 
 #ifdef U_ENABLE_NVRAM_PARSING_SUPPORT
 #include <map>
+#include <exception>
 
 #include "nvramparser.h"
 #include "parsingdata.h"
@@ -291,9 +292,12 @@ processing_done:
                 (void)parseNvarStore(varIndex);
         }
     }
-    catch (...) {
-        if (!probe)
-            msg(usprintf("%s: unable to parse AMI NVAR storage", __FUNCTION__), index);
+    catch (const std::exception& error) {
+        if (nvar.size() >= sizeof(UINT32)
+            && readUnaligned((const UINT32*)nvar.constData()) == NVRAM_NVAR_ENTRY_SIGNATURE)
+            reportParseError("AMI NVAR", model->headerSize(index), error.what(), index);
+        else if (!probe)
+            msg(usprintf("%s: unable to parse AMI NVAR storage: %s", __FUNCTION__, error.what()), index);
         return U_INVALID_STORE;
     }
 
@@ -518,8 +522,8 @@ USTATUS NvramParser::parseNvramVolumeBody(const UModelIndex & index,const UINT32
             storeOffset += storeSize - 1;
             previousStoreEndOffset = storeOffset + 1;
             continue;
-        } catch (...) {
-           // Parsing failed, try something else
+        } catch (const std::exception& error) {
+            reportParseError("VSS", localOffset + storeOffset, error.what(), index);
         }
 not_vss:
         // VSS2
@@ -675,8 +679,8 @@ not_vss:
             storeOffset += storeSize - 1;
             previousStoreEndOffset = storeOffset + 1;
             continue;
-        } catch (...) {
-           // Parsing failed, try something else
+        } catch (const std::exception& error) {
+            reportParseError("VSS2", localOffset + storeOffset, error.what(), index);
         }
 not_vss2:
         // Do not try any other parsers if we are here for FDC store parsing
@@ -771,8 +775,8 @@ not_vss2:
             storeOffset += storeSize - 1;
             previousStoreEndOffset = storeOffset + 1;
             continue;
-        } catch (...) {
-            // Parsing failed, try something else
+        } catch (const std::exception& error) {
+            reportParseError("FTW", localOffset + storeOffset, error.what(), index);
         }
 not_ftw:
         // Insyde FDC
@@ -816,8 +820,8 @@ not_ftw:
             storeOffset += storeSize - 1;
             previousStoreEndOffset = storeOffset + 1;
             continue;
-        } catch (...) {
-            // Parsing failed, try something else
+        } catch (const std::exception& error) {
+            reportParseError("Insyde FDC", localOffset + storeOffset, error.what(), index);
         }
 not_fdc:
         // Apple SysF
@@ -917,8 +921,8 @@ not_fdc:
             storeOffset += storeSize - 1;
             previousStoreEndOffset = storeOffset + 1;
             continue;
-        } catch (...) {
-            // Parsing failed, try something else
+        } catch (const std::exception& error) {
+            reportParseError("Apple SysF/Diag", localOffset + storeOffset, error.what(), index);
         }
 not_sysf:
         // Phoenix Flash Map
@@ -934,7 +938,8 @@ not_sysf:
                 // No need to parse further, not a Phoenix Flash Map
                 goto not_flm;
             }
-            UINT32 storeSize = sizeof(PHOENIX_FLASH_MAP_HEADER) + storeHeader->NumEntries * sizeof(PHOENIX_FLASH_MAP_ENTRY);
+            UINT32 storeSize = MIN(volumeBodySize - storeOffset,
+                sizeof(PHOENIX_FLASH_MAP_HEADER) + storeHeader->NumEntries * sizeof(PHOENIX_FLASH_MAP_ENTRY));
             
             umemstream is(volumeBody.constData() + storeOffset, storeSize);
             kaitai::kstream ks(&is);
@@ -998,8 +1003,8 @@ not_sysf:
             storeOffset += storeSize - 1;
             previousStoreEndOffset = storeOffset + 1;
             continue;
-        } catch (...) {
-            // Parsing failed, try something else
+        } catch (const std::exception& error) {
+            reportParseError("Phoenix Flash Map", localOffset + storeOffset, error.what(), index);
         }
 not_flm:
         // Phoenix EVSA store
@@ -1206,8 +1211,8 @@ not_flm:
             storeOffset += storeSize - 1;
             previousStoreEndOffset = storeOffset + 1;
             continue;
-        } catch (...) {
-            // Parsing failed, try something else
+        } catch (const std::exception& error) {
+            reportParseError("Phoenix EVSA", localOffset + storeOffset, error.what(), index);
         }
  not_evsa:
         // Phoenix CMDB store
@@ -1293,8 +1298,8 @@ not_cmdb:
             storeOffset += storeSize - 1;
             previousStoreEndOffset = storeOffset + 1;
             continue;
-        } catch (...) {
-            // Parsing failed, try something else
+        } catch (const std::exception& error) {
+            reportParseError("SLIC public key", localOffset + storeOffset, error.what(), index);
         }
 not_pubkey:
         // SLIC marker
@@ -1348,8 +1353,8 @@ not_pubkey:
             storeOffset += storeSize - 1;
             previousStoreEndOffset = storeOffset + 1;
             continue;
-        } catch (...) {
-            // Parsing failed, try something else
+        } catch (const std::exception& error) {
+            reportParseError("SLIC marker", localOffset + storeOffset, error.what(), index);
         }
 not_marker:
         // Intel uCode

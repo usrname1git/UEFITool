@@ -28,8 +28,15 @@ FOREACH(source IN LISTS extract_sources)
   LIST(APPEND parser_sources "${absolute_source}")
  ENDIF()
 ENDFOREACH()
-ADD_EXECUTABLE(descriptor_parser_tests descriptor_parser_tests.cpp ${parser_sources})
-TARGET_COMPILE_DEFINITIONS(descriptor_parser_tests PRIVATE
+ADD_LIBRARY(parser_test_support STATIC ${parser_sources} ../UEFIExtract/ffsdumper.cpp)
+TARGET_COMPILE_DEFINITIONS(parser_test_support PUBLIC
  U_ENABLE_NVRAM_PARSING_SUPPORT U_ENABLE_ME_PARSING_SUPPORT
  U_ENABLE_FIT_PARSING_SUPPORT U_ENABLE_GUID_DATABASE_SUPPORT)
+ADD_EXECUTABLE(descriptor_parser_tests descriptor_parser_tests.cpp)
+TARGET_LINK_LIBRARIES(descriptor_parser_tests PRIVATE parser_test_support)
 ADD_TEST(NAME descriptor_parser COMMAND descriptor_parser_tests)
+
+ADD_EXECUTABLE(parser_regression_tests parser_regression_tests.cpp brotli_decoder_tests.c)
+TARGET_LINK_LIBRARIES(parser_regression_tests PRIVATE parser_test_support)
+ADD_TEST(NAME parser_regressions COMMAND parser_regression_tests "${CMAKE_CURRENT_BINARY_DIR}/regression-output")
+SET_TESTS_PROPERTIES(parser_regressions PROPERTIES TIMEOUT 30)

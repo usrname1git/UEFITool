@@ -44,6 +44,9 @@ private:
     TreeModel *model;
     FfsParser *ffsParser;
     std::vector<std::pair<UString, UModelIndex> > messagesVector;
+    void reportParseError(const char* format, UINT32 offset, const char* reason, const UModelIndex& index) {
+        msg(usprintf("NVRAM: recognized %s candidate at offset %Xh, but parsing failed: %s", format, offset, reason), index);
+    }
     void msg(const UString & message, const UModelIndex & index = UModelIndex()) {
         messagesVector.push_back(std::pair<UString, UModelIndex>(message, index));
     };

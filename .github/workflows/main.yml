@@ -9,14 +9,14 @@ on:
 
 jobs:
   descriptor_tests:
-    name: Native descriptor regressions (Windows x64, no Qt)
+    name: Native parser regressions (Windows x64, no Qt)
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v6
       - name: Configure descriptor tests
         run: cmake -S tests -B build-descriptor-tests -A x64
       - name: Build descriptor tests
-        run: cmake --build build-descriptor-tests --config Release --target descriptor_access_tests descriptor_parser_tests --parallel 2
+        run: cmake --build build-descriptor-tests --config Release --target descriptor_access_tests descriptor_parser_tests parser_regression_tests --parallel 2
       - name: Run descriptor tests
         run: ctest --test-dir build-descriptor-tests -C Release --output-on-failure
 
@@ -105,11 +105,14 @@ jobs:
         run: cmake -E make_directory ${{runner.workspace}}/build
       - name: Configure everything
         working-directory: ${{runner.workspace}}/build
-        run: cmake ../UEFITool
+        run: cmake -DBUILD_UI_TESTS=ON ../UEFITool
       - name: Build everything
         working-directory: ${{runner.workspace}}/build
         shell: bash
         run: cmake --build . --config Release
+      - name: Run parser and offscreen UI regressions
+        working-directory: ${{runner.workspace}}/build
+        run: ctest --output-on-failure
       - name: Create dist directory
         run: cmake -E make_directory ${{runner.workspace}}/UEFITool/dist
       - name: Archive everything

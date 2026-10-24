@@ -15,10 +15,16 @@ WITHOUT WARRANTIES OR REPRESENTATIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED.
 
 #include <fstream>
 
+static bool headerMatchesGuid(const UByteArray& header, const UString& guid, UINT32 offset = 0)
+{
+    return header.size() >= offset + sizeof(EFI_GUID)
+        && guidToUString(readUnaligned((const EFI_GUID*)(header.constData() + offset))) == guid;
+}
+
 USTATUS FfsDumper::dump(const UModelIndex & root, const UString & path, const DumpMode dumpMode, const UINT8 sectionType, const UString & guid)
 {
     dumped = false;
-    counterHeader = counterBody = counterRaw = counterInfo = 0;
+    counterHeader = counterBody = counterUncData = counterRaw = counterInfo = 0;
     fileList.clear();
 
     if (changeDirectory(path)) {
@@ -47,11 +53,14 @@ USTATUS FfsDumper::recursiveDump(const UModelIndex & index, const UString & path
     if (!index.isValid())
         return U_INVALID_PARAMETER;
 
+    const bool matchesSectionType = sectionType == IgnoreSectionType
+        || (model->type(index) == Types::Section && model->subtype(index) == sectionType);
+
     if (guid.isEmpty() ||
-        (model->subtype(index) == EFI_SECTION_FREEFORM_SUBTYPE_GUID &&
-            guidToUString(readUnaligned((const EFI_GUID*)(model->header(index).constData() + sizeof(EFI_COMMON_SECTION_HEADER)))) == guid) ||
-        guidToUString(readUnaligned((const EFI_GUID*)model->header(index).constData())) == guid ||
-        guidToUString(readUnaligned((const EFI_GUID*)model->header(model->findParentOfType(index, Types::File)).constData())) == guid) {
+        (model->type(index) == Types::Section && model->subtype(index) == EFI_SECTION_FREEFORM_SUBTYPE_GUID &&
+            headerMatchesGuid(model->header(index), guid, sizeof(EFI_COMMON_SECTION_HEADER))) ||
+        headerMatchesGuid(model->header(index), guid) ||
+        headerMatchesGuid(model->header(model->findParentOfType(index, Types::File)), guid)) {
 
         if (!changeDirectory(path) && !makeDirectory(path)) {
             printf("Cannot use directory \"%s\" (recursiveDump part 1).\n", (const char*)path.toLocal8Bit());
@@ -64,8 +73,8 @@ USTATUS FfsDumper::recursiveDump(const UModelIndex & index, const UString & path
         }
 
         if (fileList.count(index) == 0
-            && (dumpMode == DUMP_ALL || model->rowCount(index) == 0)
-            && (sectionType == IgnoreSectionType || model->subtype(index) == sectionType)) {
+            && (dumpMode != DUMP_CURRENT || model->rowCount(index) == 0)
+            && matchesSectionType) {
 
             if ((dumpMode == DUMP_ALL || dumpMode == DUMP_CURRENT || dumpMode == DUMP_HEADER)
                 && !model->hasEmptyHeader(index)) {
@@ -174,7 +183,7 @@ USTATUS FfsDumper::recursiveDump(const UModelIndex & index, const UString & path
 
         // Always dump info unless explicitly prohibited
         if ((dumpMode == DUMP_ALL || dumpMode == DUMP_CURRENT || dumpMode == DUMP_INFO)
-            && (sectionType == IgnoreSectionType || model->subtype(index) == sectionType)) {
+            && matchesSectionType) {
             UString info = usprintf("Type: %s\nSubtype: %s\n%s%s\n",
                 itemTypeToUString(model->type(index)).toLocal8Bit(),
                 itemSubtypeToUString(model->type(index), model->subtype(index)).toLocal8Bit(),
