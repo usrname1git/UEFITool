@@ -53,6 +53,9 @@ USTATUS FfsDumper::recursiveDump(const UModelIndex & index, const UString & path
     if (!index.isValid())
         return U_INVALID_PARAMETER;
 
+    const bool matchesSectionType = sectionType == IgnoreSectionType
+        || (model->type(index) == Types::Section && model->subtype(index) == sectionType);
+
     if (guid.isEmpty() ||
         (model->type(index) == Types::Section && model->subtype(index) == EFI_SECTION_FREEFORM_SUBTYPE_GUID &&
             headerMatchesGuid(model->header(index), guid, sizeof(EFI_COMMON_SECTION_HEADER))) ||
@@ -71,7 +74,7 @@ USTATUS FfsDumper::recursiveDump(const UModelIndex & index, const UString & path
 
         if (fileList.count(index) == 0
             && (dumpMode != DUMP_CURRENT || model->rowCount(index) == 0)
-            && (sectionType == IgnoreSectionType || model->subtype(index) == sectionType)) {
+            && matchesSectionType) {
 
             if ((dumpMode == DUMP_ALL || dumpMode == DUMP_CURRENT || dumpMode == DUMP_HEADER)
                 && !model->hasEmptyHeader(index)) {
@@ -180,7 +183,7 @@ USTATUS FfsDumper::recursiveDump(const UModelIndex & index, const UString & path
 
         // Always dump info unless explicitly prohibited
         if ((dumpMode == DUMP_ALL || dumpMode == DUMP_CURRENT || dumpMode == DUMP_INFO)
-            && (sectionType == IgnoreSectionType || model->subtype(index) == sectionType)) {
+            && matchesSectionType) {
             UString info = usprintf("Type: %s\nSubtype: %s\n%s%s\n",
                 itemTypeToUString(model->type(index)).toLocal8Bit(),
                 itemSubtypeToUString(model->type(index), model->subtype(index)).toLocal8Bit(),

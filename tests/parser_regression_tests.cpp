@@ -115,7 +115,7 @@ static void extractionTests(const UString& base)
     TreeModel model;
     const UByteArray guid = EFI_FIRMWARE_FILE_SYSTEM2_GUID;
     const UString guidText = guidToUString(readUnaligned((const EFI_GUID*)guid.constData()));
-    const auto file = model.addItem(0, Types::File, 0, "File", "", "",
+    const auto file = model.addItem(0, Types::File, EFI_FV_FILETYPE_FREEFORM, "File", "", "",
         guid, UByteArray("file-body"), UByteArray(), Fixed);
     const auto section = model.addItem(16, Types::Section, EFI_SECTION_GUID_DEFINED, "Compressed", "", "",
         UByteArray(4, '\0'), UByteArray("compressed-body"), UByteArray(), Fixed, file);
@@ -137,6 +137,24 @@ static void extractionTests(const UString& base)
     UByteArray bytes;
     expect(readFileIntoBuffer(bodyPath + UString("/body.bin"), bytes)
         && bytes == model.body(section), "body mode still returns compressed bytes");
+    const UString headerPath = base + UString("/header");
+    expect(dumper.dump(file, headerPath, FfsDumper::DUMP_HEADER, EFI_SECTION_GUID_DEFINED, guidText) == U_SUCCESS,
+        "section-filtered header extraction succeeds with a colliding file subtype");
+    expect(readFileIntoBuffer(headerPath + UString("/header.bin"), bytes)
+        && bytes == model.header(section) && !isExistOnFs(headerPath + UString("/header_1.bin")),
+        "section-filtered headers contain only the matching section");
+    const UString infoPath = base + UString("/info");
+    expect(dumper.dump(file, infoPath, FfsDumper::DUMP_INFO, EFI_SECTION_GUID_DEFINED, guidText) == U_SUCCESS,
+        "section-filtered info extraction succeeds");
+    expect(readFileIntoBuffer(infoPath + UString("/info.txt"), bytes)
+        && std::string(bytes.constData(), bytes.size()).find("Type: Section") != std::string::npos
+        && !isExistOnFs(infoPath + UString("/info_1.txt")), "section-filtered info excludes the parent file");
+    const UString filePath = base + UString("/file");
+    expect(dumper.dump(file, filePath, FfsDumper::DUMP_FILE, EFI_SECTION_GUID_DEFINED, guidText) == U_SUCCESS,
+        "a matching section still permits explicit parent-file extraction");
+    expect(readFileIntoBuffer(filePath + UString("/file.ffs"), bytes)
+        && bytes == model.header(file) + model.body(file) + model.tail(file),
+        "explicit file mode retains the complete parent file");
     expect(dumper.dump(file, base + UString("/wrong-type"), FfsDumper::DUMP_UNC_DATA, EFI_SECTION_RAW, guidText) == U_ITEM_NOT_FOUND,
         "section filter does not accidentally dump a different non-leaf type");
     expect(dumper.dump(file, base + UString("/wrong-guid"), FfsDumper::DUMP_UNC_DATA,
@@ -146,6 +164,23 @@ static void extractionTests(const UString& base)
     expect(dumper.dump(file, defaultPath) == U_SUCCESS, "default leaf dump still succeeds");
     expect(!isExistOnFs(defaultPath + UString("/header.bin")), "default dump omits the non-leaf root");
     expect(!isExistOnFs(defaultPath + UString("/0 Compressed/unc_data.bin")), "default dump omits non-leaf uncompressed data");
+
+    TreeModel noMatch;
+    const auto unmatchedFile = noMatch.addItem(0, Types::File, EFI_FV_FILETYPE_FREEFORM, "Unmatched", "", "",
+        guid, UByteArray("not-a-guided-section"), UByteArray(), Fixed);
+    noMatch.addItem(16, Types::Section, EFI_SECTION_RAW, "Raw", "", "",
+        UByteArray(4, '\0'), UByteArray("raw-body"), UByteArray(), Fixed, unmatchedFile);
+    FfsDumper unmatchedDumper(&noMatch);
+    for (const auto mode : {FfsDumper::DUMP_HEADER, FfsDumper::DUMP_BODY, FfsDumper::DUMP_INFO, FfsDumper::DUMP_FILE}) {
+        expect(unmatchedDumper.dump(unmatchedFile, base + usprintf("/no-match-%u", static_cast<unsigned>(mode)),
+            mode, EFI_SECTION_GUID_DEFINED, guidText) == U_ITEM_NOT_FOUND,
+            "a colliding FFS subtype without a matching section cannot report success");
+    }
+    const UString unfilteredPath = base + UString("/unfiltered");
+    expect(unmatchedDumper.dump(unmatchedFile, unfilteredPath, FfsDumper::DUMP_BODY) == U_SUCCESS,
+        "unfiltered explicit extraction still includes non-section items");
+    expect(readFileIntoBuffer(unfilteredPath + UString("/body.bin"), bytes)
+        && bytes == noMatch.body(unmatchedFile), "unfiltered body mode preserves the non-leaf file bytes");
 }
 
 static void brotliTests()

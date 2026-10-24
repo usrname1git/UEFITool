@@ -114,7 +114,9 @@ request for more input.
 
 Explicit UEFIExtract `header`, `body`, `unc_data` and `file` modes include
 matching non-leaf items. `body` remains the stored bytes; `unc_data` is the
-decompressed data. GUID and section-type filters still apply. The default
+decompressed data. GUID and section-type filters still apply. A section-type
+filter matches section nodes only, not files with the same numeric subtype;
+`file` mode can still return the parent file of a matching section. The default
 leaf-only dump and `all` mode retain their behavior.
 
 NVRAM candidates that pass format recognition but fail Kaitai parsing now
